@@ -374,8 +374,8 @@ static void set_primary_display_transform_matrix(omap_hwc_device_t *hwc_dev)
     /* Create primary display translation matrix */
     int lcd_w = display->disp_link.mode->hdisplay;
     int lcd_h = display->disp_link.mode->vdisplay;
-    int orig_w = 800;//display->disp_link.fb.width;
-    int orig_h = 480;//display->disp_link.fb.height;
+    int orig_w = display->disp_link.fb.width;
+    int orig_h = display->disp_link.fb.height;
     hwc_rect_t region = {.left = 0, .top = 0, .right = orig_w, .bottom = orig_h};
     display_transform_t *transform = &display->transform;
 
@@ -483,7 +483,7 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
 
 
     //allocate the display object
-    init_primary_lcd_display(hwc_dev, 800, 480, NULL);
+    init_primary_lcd_display(hwc_dev, mode->hdisplay, mode->vdisplay, NULL);
 
     display_t *display = hwc_dev->displays[HWC_DISPLAY_PRIMARY];
     display->disp_link.con = connector;
@@ -524,7 +524,7 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
            &primary->mirroring_region.right, &primary->mirroring_region.bottom) != 4 ||
            primary->mirroring_region.left >= primary->mirroring_region.right ||
            primary->mirroring_region.top >= primary->mirroring_region.bottom) {
-        struct hwc_rect fb_region = { .right = 800, .bottom = 480 };
+        struct hwc_rect fb_region = { .right = mode->hdisplay, .bottom = mode->vdisplay };
         primary->mirroring_region = fb_region;
     }
     ALOGI("clone region is set to (%d,%d) to (%d,%d)",
@@ -571,8 +571,6 @@ int update_display(omap_hwc_device_t *ctx, int disp,
 
     width = hnd->iWidth;
     height = hnd->iHeight;
-
-    ALOGE("Width: %d, Height: %d\n", width, height);
 
     uint32_t bo[4] = { 0 };
     uint32_t pitch[4] = { width * 4}; //stride
