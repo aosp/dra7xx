@@ -18,3 +18,5 @@
 PRODUCT_PACKAGES += \
     hwcomposer.jacinto6 \
 
+
+PRODUCT_VENDOR_KERNEL_HEADERS := hardware/ti/dra7xx/kernel-headers
