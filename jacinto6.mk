@@ -17,6 +17,11 @@
 
 PRODUCT_PACKAGES += \
     hwcomposer.jacinto6 \
-
+    libmmrpc \
+    libdce \
+    libOMX_Core \
+    libOMX \
+    libosal \
+    libOMX.TI.DUCATI1.VIDEO.H264E
 
 PRODUCT_VENDOR_KERNEL_HEADERS := hardware/ti/dra7xx/kernel-headers
