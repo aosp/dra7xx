@@ -427,9 +427,15 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
 	drmModeEncoder *encoder;
 	drmModeModeInfoPtr mode;
 	uint32_t possible_crtcs;
+	hw_module_t *pmodule = NULL;
 	IMG_gralloc_module_public_t *m = NULL;
 
+	hw_get_module(GRALLOC_HARDWARE_MODULE_ID, (const hw_module_t **)&pmodule);
+	m = (IMG_gralloc_module_public_t *)(pmodule);
+	drm_fd = m->drm_fd;
+	ALOGE("Set drm fd (%d) to gralloc", drm_fd);
 	 /* Open DRM device */
+#if 0
 	for (i = 0; i < ARRAY_SIZE(modules); i++) {
 		drm_fd = drmOpen(modules[i], NULL);
 		if (drm_fd >= 0) {
@@ -437,12 +443,13 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
 			break;
 		}
 	}
-
+#endif
 	if (drm_fd < 0) {
 		ALOGE("Failed to open DRM: %s\n", strerror(errno));
 		return -EINVAL;
 	}
 
+	drmSetMaster(drm_fd);
 	resources = drmModeGetResources(drm_fd);
 	if (!resources) {
 		ALOGE("Failed to get resources: %s\n", strerror(errno));
@@ -472,6 +479,7 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
 
 	hwc_dev->drm_fd = drm_fd;
     hwc_dev->drm_resources = resources;
+#if 0
 	{
 		hw_module_t *pmodule = NULL;
 		IMG_gralloc_module_public_t *m = NULL;
@@ -480,7 +488,7 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
 		ALOGI("Set drm fd (%d) to gralloc", drm_fd);
 		m->drm_fd = drm_fd;
 	}
-
+#endif
 
     //allocate the display object
     init_primary_lcd_display(hwc_dev, mode->hdisplay, mode->vdisplay, NULL);
@@ -531,6 +539,7 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
             primary->mirroring_region.left, primary->mirroring_region.top,
             primary->mirroring_region.right, primary->mirroring_region.bottom);
 
+    drmDropMaster(drm_fd);
     return 0;
 
 
@@ -577,6 +586,7 @@ int update_display(omap_hwc_device_t *ctx, int disp,
     uint32_t offset[4] = { 0 };
 
 
+    drmSetMaster(ctx->drm_fd);
 	/*FIXME: Get gem handle from dma buf fd */
 
     ret = drmPrimeFDToHandle (ctx->drm_fd, hnd->fd[0], &bo[0]);
@@ -618,6 +628,7 @@ int update_display(omap_hwc_device_t *ctx, int disp,
     kdisp->last_fb = fb;
 
 
+    drmDropMaster(ctx->drm_fd);
     return 0;
 }
 
