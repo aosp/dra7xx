@@ -31,7 +31,7 @@ LOCAL_SHARED_LIBRARIES := \
     libhardware \
     libdce
 
-LOCAL_CFLAGS += -Dxdc_target_types__=google/targets/arm/std.h -DSUPPORT_ANDROID_FRAMEBUFFER_HAL -DSUPPORT_ANDROID_MEMTRACK_HAL -DBUILDOS_ANDROID
+LOCAL_CFLAGS += -Dxdc_target_types__=google/targets/arm/std.h -DSUPPORT_ANDROID_FRAMEBUFFER_HAL -DSUPPORT_ANDROID_MEMTRACK_HAL -DBUILDOS_ANDROID -Dxdc__deprecated_types
 
 LOCAL_MODULE_TAGS:= optional
 
