@@ -22,6 +22,8 @@ PRODUCT_PACKAGES += \
     libOMX_Core \
     libOMX \
     libosal \
-    libOMX.TI.DUCATI1.VIDEO.H264E
+    libOMX.TI.DUCATI1.VIDEO.H264E \
+    libstagefrighthw \
+    libOMX.TI.DUCATI1.VIDEO.DECODER
 
 PRODUCT_VENDOR_KERNEL_HEADERS := hardware/ti/dra7xx/kernel-headers
