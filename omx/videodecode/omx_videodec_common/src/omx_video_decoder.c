@@ -253,9 +253,7 @@ OMX_ERRORTYPE OMXVidDec_SetParameter(OMX_HANDLETYPE hComponent,
                 //and compression format.
 
                if (pVidDecComp->sBase.pPorts[pOutputPortDef->nPortIndex]->sProps.eBufMemoryType == MEM_GRALLOC) {
-                    ALOGE("pOutputPortDef->format.video.eColorFormat[%x]\n", pOutputPortDef->format.video.eColorFormat);
-
-                   //OMX_CHECK((pOutputPortDef->format.video.eColorFormat == HAL_NV12_PADDED_PIXEL_FORMAT),
+                    //OMX_CHECK((pOutputPortDef->format.video.eColorFormat == HAL_NV12_PADDED_PIXEL_FORMAT),
                      //       OMX_ErrorUnsupportedSetting);
                 } else {
                     OMX_CHECK((pOutputPortDef->format.video.eColorFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar),
@@ -298,8 +296,7 @@ OMX_ERRORTYPE OMXVidDec_SetParameter(OMX_HANDLETYPE hComponent,
                 //Check for the supported Color-fromat
                 //and compression format.
                if (pVidDecComp->sBase.pPorts[pVideoParams->nPortIndex]->sProps.eBufMemoryType == MEM_GRALLOC) {
-                    ALOGE("pOutputPortDef->format.video.eColorFormatttt[%x]\n", pOutputPortDef->format.video.eColorFormat);
-                   // OMX_CHECK((pVideoParams->eColorFormat == HAL_NV12_PADDED_PIXEL_FORMAT),
+                    // OMX_CHECK((pVideoParams->eColorFormat == HAL_NV12_PADDED_PIXEL_FORMAT),
                            // OMX_ErrorUnsupportedSetting);
                 } else {
                     OMX_CHECK((pVideoParams->eColorFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar),
@@ -378,7 +375,6 @@ OMX_ERRORTYPE OMXVidDec_SetParameter(OMX_HANDLETYPE hComponent,
         break;
 
         default :
-            ALOGE("calling BAse call setparameter\n");
             eError = OMXBase_SetParameter(hComponent, nIndex, pParamStruct);
     }
 
@@ -412,11 +408,8 @@ OMX_ERRORTYPE OMXVidDec_GetParameter(OMX_HANDLETYPE hComponent,
     OMX_CHECK(pVidDecComp->sBase.tCurState != OMX_StateInvalid,
             OMX_ErrorIncorrectStateOperation);
 
-ALOGE("OMXVidDec_GetPArameter\n");
-
     switch( nIndex ) {
         case OMX_IndexParamVideoPortFormat :
-ALOGE("OMX_IndexParamVideoPortFormat\n");
             OMX_BASE_CHK_VERSION(pParamStruct, OMX_VIDEO_PARAM_PORTFORMATTYPE, eError);
             // Initialize Port Params
             pVideoParams = (OMX_VIDEO_PARAM_PORTFORMATTYPE *) pParamStruct;
@@ -426,18 +419,14 @@ ALOGE("OMX_IndexParamVideoPortFormat\n");
                 if( pVideoParams->nIndex > inPortParam.nIndex ) {
                     return (OMX_ErrorNoMore);
                 }
-ALOGE("OMX_IndexParamVideoPortFormat1\n");
                 pVideoParams->eCompressionFormat = inPortParam.eCompressionFormat;
                 pVideoParams->eColorFormat = inPortParam.eColorFormat;
                 pVideoParams->xFramerate = inPortParam.xFramerate;
                 if(pVideoParams->eColorFormat == OMX_COLOR_FormatYUV420PackedSemiPlanar)
                     pVideoParams->eColorFormat = OMX_TI_COLOR_FormatYUV420PackedSemiPlanar;
                 } else if( pVideoParams->nPortIndex == outPortParam.nPortIndex ) {
-ALOGE("OMX_IndexParamVideoPortFormat2\n");
                     if( pVideoParams->nIndex == 0 ) {
-ALOGE("OMX_IndexParamVideoPortFormat3\n");
                             if (pVidDecComp->sBase.pPorts[pVideoParams->nPortIndex]->sProps.eBufMemoryType == MEM_GRALLOC) {
-                            ALOGE("Buffers are of GRALLOC pointerts, so use HAL format\n");
                             pVideoParams->eColorFormat = HAL_NV12_PADDED_PIXEL_FORMAT;
                         } else {
                             pVideoParams->eColorFormat = OMX_TI_COLOR_FormatYUV420PackedSemiPlanar;
@@ -1147,11 +1136,9 @@ OMX_ERRORTYPE OMXVidDec_DataNotify(OMX_HANDLETYPE hComponent)
                                     0,0,pVidDecComp->sBase.pPorts[OMX_VIDDEC_OUTPUT_PORT]->sPortDef.format.video.nFrameWidth,
                                     pVidDecComp->sBase.pPorts[OMX_VIDDEC_OUTPUT_PORT]->sPortDef.format.video.nFrameHeight,NULL);
         }
-ALOGE("Process++\n");
+
         status =  VIDDEC3_process(pVidDecComp->pDecHandle, pInBufDescPtr, pOutBufDescPtr,
                                 (VIDDEC3_InArgs *)pVidDecComp->pDecInArgs, (VIDDEC3_OutArgs *)pVidDecComp->pDecOutArgs);
-
-ALOGE("Process--\n");
 
         pDecOutArgs = pVidDecComp->pDecOutArgs;
 
@@ -1472,7 +1459,6 @@ OMX_ERRORTYPE OMXVidDec_GetExtensionIndex(OMX_HANDLETYPE hComponent,
     }
 
     if(strcmp(cParameterName, "OMX.google.android.index.enableAndroidNativeBuffers") == 0) {
-        ALOGE("OMX_TI_IndexUseNativeBuffers\n");
         // If Index type is 2D Buffer Allocated Dimension
         *pIndexType = (OMX_INDEXTYPE) OMX_TI_IndexUseNativeBuffers;
         goto EXIT;
@@ -1481,7 +1467,6 @@ OMX_ERRORTYPE OMXVidDec_GetExtensionIndex(OMX_HANDLETYPE hComponent,
         *pIndexType = (OMX_INDEXTYPE) NULL;
         goto EXIT;
     } else if (strcmp(cParameterName, "OMX.google.android.index.getAndroidNativeBufferUsage") == 0) {
-        ALOGE("chekcing OMX.google.android.index.getAndroidNativeBufferUsage\n");
         *pIndexType = (OMX_INDEXTYPE) OMX_TI_IndexAndroidNativeBufferUsage;
     } else if( strcmp(cParameterName, "OMX_TI_IndexParamTimeStampInDecodeOrder") == 0 ) {
         // If Index type is Time Stamp In Decode Order
