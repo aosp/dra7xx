@@ -341,6 +341,11 @@ static void setup_lcd_config(display_config_t *config, int xres, int yres, struc
     setup_config(config, xres, yres, info, LCD_DISPLAY_FPS, LCD_DISPLAY_DEFAULT_DPI);
 }
 
+static void setup_hdmi_config(display_config_t *config, int xres, int yres, struct dsscomp_display_info *info)
+{
+    setup_config(config, xres, yres, info, HDMI_DISPLAY_FPS, HDMI_DISPLAY_DEFAULT_DPI);
+}
+
 static int init_primary_lcd_display(omap_hwc_device_t *hwc_dev, uint32_t xres, uint32_t yres, struct dsscomp_display_info *info)
 {
     int err;
@@ -399,6 +404,106 @@ static void set_primary_display_transform_matrix(omap_hwc_device_t *hwc_dev)
     translate_matrix(transform->matrix, lcd_w >> 1, lcd_h >> 1);
 }
 
+static void set_external_display_transform_matrix(omap_hwc_device_t *hwc_dev, int disp)
+{
+    display_t *display = hwc_dev->displays[disp];
+    display_transform_t *transform = &display->transform;
+    int orig_xres = WIDTH(transform->region);
+    int orig_yres = HEIGHT(transform->region);
+    float orig_center_x = transform->region.left + orig_xres / 2.0f;
+    float orig_center_y = transform->region.top + orig_yres / 2.0f;
+
+    /* Reorientation matrix is:
+       m = (center-from-target-center) * (scale-to-target) * (mirror) * (rotate) * (center-to-original-center) */
+
+    memcpy(transform->matrix, unit_matrix, sizeof(unit_matrix));
+    translate_matrix(transform->matrix, -orig_center_x, -orig_center_y);
+    rotate_matrix(transform->matrix, transform->rotation);
+    if (transform->hflip)
+        scale_matrix(transform->matrix, 1, -1, 1, 1);
+
+    primary_display_t *primary = get_primary_display_info(hwc_dev);
+    if (!primary)
+        return;
+
+    float xpy = primary->xpy;
+
+    if (transform->rotation & 1) {
+        SWAP(orig_xres, orig_yres);
+        xpy = 1.0f / xpy;
+    }
+
+    /* get target size */
+    uint32_t adj_xres, adj_yres;
+    uint32_t width, height;
+    int xres, yres;
+
+    if (is_hdmi_display(hwc_dev, disp)) {
+        hdmi_display_t *hdmi = &((external_hdmi_display_t*)display)->hdmi;
+        width = hdmi->width;
+        height = hdmi->height;
+        xres = display->disp_link.mode->hdisplay;;
+        yres = display->disp_link.mode->hdisplay;;
+    } else {
+        display_config_t *config = &display->configs[display->active_config_ix];
+        width = 0;
+        height = 0;
+        xres = config->xres;
+        yres = config->yres;
+    }
+
+    display->transform.scaling = ((xres != orig_xres) || (yres != orig_yres));
+
+    get_max_dimensions(orig_xres, orig_yres, xpy,
+                       xres, yres, width, height,
+                       &adj_xres, &adj_yres);
+
+    scale_matrix(transform->matrix, orig_xres, adj_xres, orig_yres, adj_yres);
+    translate_matrix(transform->matrix, xres >> 1, yres >> 1);
+}
+
+static int setup_external_display_transform(omap_hwc_device_t *hwc_dev, int disp)
+{
+    display_t *display = hwc_dev->displays[disp];
+
+    if (display->opmode == DISP_MODE_PRESENTATION) {
+        display_config_t *config = &display->configs[display->active_config_ix];
+        struct hwc_rect src_region = { .right = config->xres, .bottom = config->yres };
+        display->transform.region = src_region;
+    } else {
+        primary_display_t *primary = get_primary_display_info(hwc_dev);
+        if (!primary)
+            return -ENODEV;
+
+        display->transform.region = primary->mirroring_region;
+    }
+
+    uint32_t xres = WIDTH(display->transform.region);
+    uint32_t yres = HEIGHT(display->transform.region);
+
+    if (!(xres && yres))
+        return -EINVAL;
+
+    int rot_flip = (yres > xres) ? 3 : 0;
+    display->transform.rotation = rot_flip & EXT_ROTATION;
+    display->transform.hflip = (rot_flip & EXT_HFLIP) > 0;
+
+    if (display->transform.rotation & 1)
+        SWAP(xres, yres);
+
+    set_external_display_transform_matrix(hwc_dev, disp);
+
+    return 0;
+}
+
+static int init_hdmi_display(omap_hwc_device_t *hwc_dev, int disp)
+{
+    hdmi_display_t *hdmi = (hdmi_display_t*)hwc_dev->displays[disp];
+    if (!hdmi)
+        return -ENODEV;
+
+    return 0;
+}
 
 static void vblank_handler(int fd, unsigned int frame, unsigned int sec,
         unsigned int usec, void *data)
@@ -647,7 +752,121 @@ primary_display_t *get_primary_display_info(omap_hwc_device_t *hwc_dev)
     return primary;
 }
 
+int add_external_hdmi_display(omap_hwc_device_t *hwc_dev)
+{
+    if (hwc_dev->displays[HWC_DISPLAY_EXTERNAL]) {
+        ALOGE("Display %d is already connected", HWC_DISPLAY_EXTERNAL);
+        return -EBUSY;
+    }
 
+	drmModeConnector *connector;
+	drmModeEncoder *encoder;
+	drmModeModeInfoPtr mode;
+	uint32_t possible_crtcs;
+
+    int err, i, n, j;
+
+    drmSetMaster(hwc_dev->drm_fd);
+
+	connector = drmModeGetConnector(hwc_dev->drm_fd, hwc_dev->drm_resources->connectors[HWC_DISPLAY_EXTERNAL]);
+	if (!connector) {
+		ALOGE("No connector for DISPLAY %d\n", HWC_DISPLAY_EXTERNAL);
+		return -1;
+	}
+
+    //set the mode for connector to fix 640x480 resolution
+	mode = &connector->modes[0];
+
+	encoder = drmModeGetEncoder(hwc_dev->drm_fd, connector->encoders[0]);
+	if (!encoder) {
+		ALOGE("Failed to get encoder\n");
+		goto free_connector;
+	}
+
+    drmDropMaster(hwc_dev->drm_fd);
+
+	i = 0;
+	n = encoder->possible_crtcs;
+	while (!(n & 1)) {
+		n >>= 1;
+		i++;
+	}
+
+    err = allocate_display(sizeof(external_hdmi_display_t), HDMI_DISPLAY_CONFIGS, &hwc_dev->displays[HWC_DISPLAY_EXTERNAL]);
+    if (err)
+        return err;
+
+    //allocate the display object
+    err = init_hdmi_display(hwc_dev, HWC_DISPLAY_EXTERNAL);
+    if (err) {
+        remove_external_hdmi_display(hwc_dev);
+        return err;
+    }
+
+    display_t *display = hwc_dev->displays[HWC_DISPLAY_EXTERNAL];
+    display->disp_link.con = connector;
+    display->disp_link.enc = encoder;
+    display->disp_link.crtc_id = hwc_dev->drm_resources->crtcs[i];
+
+    //Change the mode to PREFERRED_HDMI_RESOLUTION
+
+	for (j = 0; j < connector->count_modes; j++) {
+		mode = &connector->modes[j];
+		if (!strcmp(mode->name, PREFERRED_HDMI_RESOLUTION)) {
+            break;
+		}
+    }
+
+    display->disp_link.mode = mode;
+    display->disp_link.evctx.version = DRM_EVENT_CONTEXT_VERSION;
+    display->disp_link.evctx.vblank_handler = vblank_handler;
+    display->disp_link.ctx = hwc_dev;
+    display->role = DISP_ROLE_EXTERNAL;
+    display->opmode = DISP_MODE_PRESENTATION;
+    display->type = DISP_TYPE_HDMI;
+    display->mgr_ix = 1;
+    display->blanked = true;
+
+    /* SurfaceFlinger currently doesn't unblank external display on reboot.
+     * Unblank HDMI display by default.
+     * See SurfaceFlinger::readyToRun() function.
+     */
+    display->update_transform = true;
+
+    //IMG_framebuffer_device_public_t *fb_dev = hwc_dev->fb_dev[HWC_DISPLAY_EXTERNAL];
+    uint32_t xres = HDMI_FB_WIDTH;
+    uint32_t yres = HDMI_FB_HEIGHT;
+
+    // TODO: Verify that HDMI supports xres x yres
+    // TODO: Set HDMI resolution? What if we need to do docking of 1080p i.s.o. Presentation?
+
+    setup_hdmi_config(&display->configs[0], xres, yres, &display->disp_link);
+
+    external_hdmi_display_t *ext_hdmi = (external_hdmi_display_t*)display;
+ 
+    /* check set props */
+    char value[PROPERTY_VALUE_MAX];
+    property_get("persist.hwc.avoid_mode_change", value, "1");
+    ext_hdmi->avoid_mode_change = atoi(value) > 0;
+
+    return 0;
+
+
+free_connector:
+	drmModeFreeConnector(connector);
+	return -1;
+}
+
+void remove_external_hdmi_display(omap_hwc_device_t *hwc_dev)
+{
+    display_t *display = hwc_dev->displays[HWC_DISPLAY_EXTERNAL];
+    if (!display) {
+        ALOGW("Failed to remove non-existent display %d", HWC_DISPLAY_EXTERNAL);
+        return;
+    }
+
+    remove_display(hwc_dev, HWC_DISPLAY_EXTERNAL);
+}
 
 static int get_layer_stack(omap_hwc_device_t *hwc_dev, int disp, uint32_t *stack)
 {
@@ -724,6 +943,21 @@ void set_display_contents(omap_hwc_device_t *hwc_dev, size_t num_displays, hwc_d
     }
 
     update_primary_display_orientation(hwc_dev);
+}
+
+int get_external_display_id(omap_hwc_device_t *hwc_dev)
+{
+    size_t i;
+    int disp = -1;
+
+    for (i = HWC_DISPLAY_EXTERNAL; i < MAX_DISPLAYS; i++) {
+        if (hwc_dev->displays[i] && hwc_dev->displays[i]->type != DISP_TYPE_UNKNOWN) {
+            disp = i;
+            break;
+        }
+    }
+
+    return disp;
 }
 
 int get_display_configs(omap_hwc_device_t *hwc_dev, int disp, uint32_t *configs, size_t *numConfigs)
@@ -818,6 +1052,10 @@ bool is_lcd_display(omap_hwc_device_t *hwc_dev, int disp)
     return is_valid_display(hwc_dev, disp) && hwc_dev->displays[disp]->type == DISP_TYPE_LCD;
 }
 
+bool is_hdmi_display(omap_hwc_device_t *hwc_dev, int disp)
+{
+    return is_valid_display(hwc_dev, disp) && hwc_dev->displays[disp]->type == DISP_TYPE_HDMI;
+}
 
 int blank_display(omap_hwc_device_t *hwc_dev, int disp)
 {
@@ -895,6 +1133,8 @@ int setup_display_tranfsorm(omap_hwc_device_t *hwc_dev, int disp)
 
     if (display->role == DISP_ROLE_PRIMARY)
         set_primary_display_transform_matrix(hwc_dev);
+    else
+        err = setup_external_display_transform(hwc_dev, disp);
 
     if (!err)
         display->update_transform = false;
@@ -913,7 +1153,8 @@ int apply_display_transform(omap_hwc_device_t *hwc_dev, int disp)
     if (!transform->rotation && !transform->hflip && !transform->scaling)
         return 0;
 
-    composition_t *comp = &display->composition;
+    composition_t *comp;
+    comp = &display->composition;
 
     uint32_t i;
 

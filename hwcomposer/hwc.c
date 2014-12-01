@@ -106,6 +106,13 @@ static void reserve_overlays_for_displays(omap_hwc_device_t *hwc_dev)
     primary_comp->scaling_ovls = primary_comp->avail_ovls - num_nonscaling_overlays;
     primary_comp->used_ovls = 0;
 
+    int ext_disp = get_external_display_id(hwc_dev);
+
+    if (ext_disp < 0)
+        return;
+
+    display_t *ext_display = hwc_dev->displays[ext_disp];
+
     /*
      * For primary display we must reserve at least one overlay for FB, plus an extra
      * overlay for each protected layer.
@@ -117,6 +124,20 @@ static void reserve_overlays_for_displays(omap_hwc_device_t *hwc_dev)
     /* Share available overlays between primary and external displays. */
     primary_comp->wanted_ovls = MAX(max_overlays / 2, min_primary_overlays);
     primary_comp->avail_ovls = MIN(max_primary_overlays, primary_comp->wanted_ovls);
+
+    /*
+     * We may not have enough overlays on the external display. We "reserve" them here but
+     * may not do external composition for the first frame while the overlays required for
+     * it are cleared.
+     */
+    composition_t *ext_comp = &ext_display->composition;
+
+    ext_comp->tiler1d_slot_size = hwc_dev->tiler1d_slot_size;
+    ext_comp->wanted_ovls = max_overlays - primary_comp->wanted_ovls;
+    ext_comp->avail_ovls = MIN(max_external_overlays, ext_comp->wanted_ovls);
+    ext_comp->scaling_ovls = ext_comp->avail_ovls;
+    ext_comp->used_ovls = 0;
+    ext_comp->ovl_ix_base = MAX_DSS_OVERLAYS - ext_comp->avail_ovls;
 
 }
 
@@ -160,6 +181,7 @@ static int hwc_prepare_for_display(omap_hwc_device_t *hwc_dev, int disp)
         return 0;
 
     display_t *display = hwc_dev->displays[disp];
+    hdmi_display_t *hdmi = is_hdmi_display(hwc_dev, disp) ? (hdmi_display_t*)display : NULL;
     hwc_display_contents_1_t *list = display->contents;
     composition_t *comp = &display->composition;
     layer_statistics_t *layer_stats = &display->layer_stats;
@@ -290,7 +312,7 @@ static int hwc_prepare_for_display(omap_hwc_device_t *hwc_dev, int disp)
 
 
     /* If display is blanked or not configured drop compositions */
-    if (display->blanked)
+    if (display->blanked || (hdmi && !is_hdmi_display(hwc_dev, HWC_DISPLAY_PRIMARY) && hdmi->video_mode_ix == 0))
       hwc_dev->num_ovls = 0;
 
     return 0;
@@ -484,6 +506,55 @@ static int hwc_device_close(hw_device_t* device)
     return 0;
 }
 
+
+static void handle_hotplug(omap_hwc_device_t *hwc_dev)
+{
+    /* WA: till Hotplug is integrated */
+    char value[PROPERTY_VALUE_MAX];
+    property_get("persist.hwc.hdmi.force.init", value, "0");
+    if (atoi(value)) {
+        hwc_dev->ext_disp_state = 1;
+    }
+
+    bool state = hwc_dev->ext_disp_state;
+    bool hotplug = false;
+
+    pthread_mutex_lock(&hwc_dev->ctx_mutex);
+
+    if (state) {
+        int ext_disp = get_external_display_id(hwc_dev);
+        int err = add_external_hdmi_display(hwc_dev);
+        if (err) {
+            remove_external_hdmi_display(hwc_dev);
+            pthread_mutex_unlock(&hwc_dev->ctx_mutex);
+            return;
+        }
+    } else
+        remove_external_hdmi_display(hwc_dev);
+
+    display_t *ext_display = hwc_dev->displays[HWC_DISPLAY_EXTERNAL];
+    ALOGI("external display changed (state=%d, config={tform=%ddeg%s}, tv=%d", state,
+            ext_display ? ext_display->transform.rotation * 90 : -1,
+            ext_display ? ext_display->transform.hflip ? "+hflip" : "" : "",
+            is_hdmi_display(hwc_dev, HWC_DISPLAY_EXTERNAL));
+
+    hotplug = true;
+
+    pthread_mutex_unlock(&hwc_dev->ctx_mutex);
+
+    /* hwc_dev->cb_procs is set right after the device is opened, but there is
+     * still a race condition where a hotplug event might occur after the open
+     * but before the procs are registered. */
+    if (hwc_dev->cb_procs) {
+        if (hotplug && hwc_dev->cb_procs->hotplug) {
+            hwc_dev->cb_procs->hotplug(hwc_dev->cb_procs, HWC_DISPLAY_EXTERNAL, state);
+        } else {
+            if (hwc_dev->cb_procs->invalidate)
+                hwc_dev->cb_procs->invalidate(hwc_dev->cb_procs);
+        }
+    }
+}
+
 static void hwc_registerProcs(struct hwc_composer_device_1* dev,
                                     hwc_procs_t const* procs)
 {
@@ -637,6 +708,8 @@ static int hwc_device_open(const hw_module_t* module, const char* name, hw_devic
     hwc_dev->flags_nv12_only = atoi(value);
     property_get("debug.hwc.idle", value, "250");
     hwc_dev->idle = atoi(value);
+
+    handle_hotplug(hwc_dev);
 
     ALOGI("open_device(rgb_order=%d nv12_only=%d)",
         hwc_dev->flags_rgb_order, hwc_dev->flags_nv12_only);

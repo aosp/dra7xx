@@ -43,6 +43,12 @@
 #define ARRAY_SIZE(arr) (sizeof(arr)/sizeof((arr)[0]))
 #endif
 
+
+/* The three below parameters should be in sync, no scaling supported */
+#define PREFERRED_HDMI_RESOLUTION "1280x720"
+#define HDMI_FB_WIDTH 1280
+#define HDMI_FB_HEIGHT 720
+
 typedef struct omap_hwc_device omap_hwc_device_t;
 
 typedef struct dss_platform_info {
@@ -171,6 +177,23 @@ struct primary_lcd_display {
 };
 typedef struct primary_lcd_display primary_lcd_display_t;
 
+struct hdmi_display {
+    display_t base;
+
+    uint16_t width;         /* external screen dimensions */
+    uint16_t height;
+    uint32_t video_mode_ix;    /* TWO's complement of video mode index */
+};
+typedef struct hdmi_display hdmi_display_t;
+
+struct external_hdmi_display {
+    hdmi_display_t hdmi;
+
+    /* attributes */
+    bool avoid_mode_change;        /* use HDMI mode used for mirroring if possible */
+};
+typedef struct external_hdmi_display external_hdmi_display_t;
+
 int init_primary_display(omap_hwc_device_t *hwc_dev);
 void reset_primary_display(omap_hwc_device_t *hwc_dev);
 primary_display_t *get_primary_display_info(omap_hwc_device_t *hwc_dev);
@@ -203,5 +226,11 @@ void adjust_drm_plane_to_layer(hwc_layer_1_t const *layer, int zorder, struct dr
 bool can_dss_scale(omap_hwc_device_t *hwc_dev, uint32_t src_w, uint32_t src_h,
                    uint32_t dst_w, uint32_t dst_h, bool is_2d,
                    dss_platform_info_t *limits, uint32_t pclk);
+
+int add_external_hdmi_display(omap_hwc_device_t *hwc_dev);
+void remove_external_hdmi_display(omap_hwc_device_t *hwc_dev);
+int get_external_display_id(omap_hwc_device_t *hwc_dev);
+bool is_hdmi_display(omap_hwc_device_t *hwc_dev, int disp);
+bool is_external_display_mirroring(omap_hwc_device_t *hwc_dev, int disp);
 
 #endif
