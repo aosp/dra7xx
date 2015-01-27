@@ -1150,7 +1150,7 @@ OMX_ERRORTYPE OMXVidDec_DataNotify(OMX_HANDLETYPE hComponent)
             OSAL_ErrorTrace("Frame count is : %d", pVidDecComp->nFrameCounter + 1);
             OSAL_ErrorTrace("Bytes consumed - %d", pVidDecComp->pDecOutArgs->bytesConsumed);
 
-            if (pInBufHeader && pOutBufHeader) {
+             if( !(pVidDecComp->bInputBufferCancelled == 1 && pVidDecComp->pDecOutArgs->extendedError & 0x8000)) {
                 /*! Call function to handle Codec Error */
                 eError = OMXVidDec_HandleCodecProcError(hComponent, &(pInBufHeader), &(pOutBufHeader));
             }

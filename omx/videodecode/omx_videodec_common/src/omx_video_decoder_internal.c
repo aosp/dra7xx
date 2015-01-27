@@ -823,31 +823,30 @@ OMX_ERRORTYPE OMXVidDec_HandleCodecProcError(OMX_HANDLETYPE hComponent,
                                     OMX_VIDDEC_OUTPUT_PORT, 0, NULL);
     }
     if( pVidDecComp->nOutPortReconfigRequired == 0 ) {
-        eError = OMX_ErrorNone;
-       if( pVidDecComp->nOutbufInUseFlag == 0 ) {
-            grallocHandle = (IMG_native_handle_t*)(pOutBufHeader->pBuffer);
-            pVidDecComp->grallocModule->unlock((gralloc_module_t const *) pVidDecComp->grallocModule,
-                                                (buffer_handle_t)grallocHandle);
-
-            pVidDecComp->sBase.pPvtData->fpDioCancel(hComponent,
-                                        OMX_VIDDEC_OUTPUT_PORT, pOutBufHeader); // This buffer header is freed afterwards.
-        }
-        pVidDecComp->sBase.pPvtData->fpDioCancel(hComponent,
-                                        OMX_VIDDEC_INPUT_PORT, pInBufHeader);
-        while( pVidDecComp->pDecOutArgs->freeBufID[ii] != 0 ) {
-            pDupBufHeader = (OMX_BUFFERHEADERTYPE *)pVidDecComp->pDecOutArgs->freeBufID[ii++];
-            if( pOutBufHeader != pDupBufHeader ) {
-                grallocHandle = (IMG_native_handle_t*)(pDupBufHeader->pBuffer);
-                pVidDecComp->grallocModule->unlock((gralloc_module_t const *) pVidDecComp->grallocModule,
-                                                    (buffer_handle_t)grallocHandle);
+        if( pVidDecComp->pDecOutArgs->extendedError & 0x8000 ) {
+            eError = OMX_ErrorFormatNotDetected;
+            if( pVidDecComp->pDecDynParams->decodeHeader != pVidDecComp->nDecoderMode ) {
+                if( pVidDecComp->nOutbufInUseFlag == 0 ) {
+                    grallocHandle = (IMG_native_handle_t*)(pOutBufHeader->pBuffer);
+                    pVidDecComp->grallocModule->unlock((gralloc_module_t const *) pVidDecComp->grallocModule,
+                                                        (buffer_handle_t)grallocHandle);
+                    pVidDecComp->sBase.pPvtData->fpDioCancel(hComponent,
+                                                OMX_VIDDEC_OUTPUT_PORT, pOutBufHeader); // This buffer header is freed afterwards.
+                }
                 pVidDecComp->sBase.pPvtData->fpDioCancel(hComponent,
-                                         OMX_VIDDEC_OUTPUT_PORT, pDupBufHeader);
+                                                OMX_VIDDEC_INPUT_PORT, pInBufHeader);
+                while( pVidDecComp->pDecOutArgs->freeBufID[ii] != 0 ) {
+                    pDupBufHeader = (OMX_BUFFERHEADERTYPE *)pVidDecComp->pDecOutArgs->freeBufID[ii++];
+                    if( pOutBufHeader != pDupBufHeader ) {
+                        grallocHandle = (IMG_native_handle_t*)(pDupBufHeader->pBuffer);
+                        pVidDecComp->grallocModule->unlock((gralloc_module_t const *) pVidDecComp->grallocModule,
+                                                            (buffer_handle_t)grallocHandle);
+                        pVidDecComp->sBase.pPvtData->fpDioCancel(hComponent,
+                                                OMX_VIDDEC_OUTPUT_PORT, pDupBufHeader);
+                    }
+                }
             }
-        }
-
-        if (pVidDecComp->pDecOutArgs->extendedError & 0x8000) {
             pVidDecComp->nFatalErrorGiven = 1;
-            eError = OMX_ErrorHardware;
         }
     }
 
