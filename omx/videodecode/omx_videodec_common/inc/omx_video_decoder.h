@@ -134,7 +134,7 @@ OMX_ERRORTYPE OMXVidDec_CommandNotify(OMX_HANDLETYPE hComponent, OMX_COMMANDTYPE
 
 OMX_ERRORTYPE OMXVidDec_DataNotify(OMX_HANDLETYPE hComponent);
 
-OMX_ERRORTYPE OMXVidDec_XlateBuffHandle(OMX_HANDLETYPE hComponent, OMX_PTR pBufferHdr);
+OMX_ERRORTYPE OMXVidDec_XlateBuffHandle(OMX_HANDLETYPE hComponent, OMX_PTR pBufferHdr, OMX_BOOL bRegister);
 
 OMX_ERRORTYPE OMXVidDec_GetExtensionIndex(OMX_HANDLETYPE hComponent, OMX_STRING cParameterName,
                             OMX_INDEXTYPE *pIndexType);

@@ -908,7 +908,7 @@ OMX_ERRORTYPE OMXBase_UseBuffer(OMX_HANDLETYPE hComponent,
     (*ppBufferHdr)->nAllocLen = nSizeBytes;
 
     if (pBaseComp->fpXlateBuffHandle != NULL) {
-        eError = pBaseComp->fpXlateBuffHandle(hComponent, (OMX_PTR)(*ppBufferHdr));
+        eError = pBaseComp->fpXlateBuffHandle(hComponent, (OMX_PTR)(*ppBufferHdr), OMX_TRUE);
     }
 
     pPort->nBufferCnt++;
@@ -954,6 +954,11 @@ OMX_ERRORTYPE OMXBase_FreeBuffer(OMX_HANDLETYPE hComponent,
     /*Free buffer should not be called on a port after all buffers have been
     freed*/
     OMX_CHECK(pPort->nBufferCnt != 0, OMX_ErrorBadParameter);
+
+    /* unregister the buffer with decoder for non-allocator port*/
+    if (!pPort->bIsBufferAllocator && pBaseComp->fpXlateBuffHandle != NULL) {
+        eError = pBaseComp->fpXlateBuffHandle(hComponent, (OMX_PTR)(pBuffHeader), OMX_FALSE);
+    }
 
     /* Just decrement the buffer count and unpopulate the port,
     * buffer header pool is freed up once all the buffers are received */

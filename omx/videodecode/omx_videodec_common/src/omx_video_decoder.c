@@ -562,7 +562,7 @@ EXIT:
 * Video Decoder xlateBuffer Handles
 */
 OMX_ERRORTYPE OMXVidDec_XlateBuffHandle(OMX_HANDLETYPE hComponent,
-                                       OMX_PTR pBufferHdr)
+                                       OMX_PTR pBufferHdr, OMX_BOOL bRegister)
 {
     OMX_ERRORTYPE       eError = OMX_ErrorNone;
     OMX_COMPONENTTYPE   *pComp = NULL;
@@ -588,6 +588,13 @@ OMX_ERRORTYPE OMXVidDec_XlateBuffHandle(OMX_HANDLETYPE hComponent,
         //populate the DMA BUFF_FDs from the gralloc pointers
         for ( i = 0; i < MAX_PLANES_PER_BUFFER; i++ ) {
             ((OMXBase_BufHdrPvtData *)(pOMXBufHeader->pPlatformPrivate))->sMemHdr[i].dma_buf_fd = (OMX_U32)(((IMG_native_handle_t*)(pOMXBufHeader->pBuffer))->fd[i]);
+            if (((OMXBase_BufHdrPvtData *)(pOMXBufHeader->pPlatformPrivate))->sMemHdr[i].dma_buf_fd > 0) {
+                if (bRegister) {
+                    dce_buf_lock(1, (size_t *)&(((OMXBase_BufHdrPvtData *)(pOMXBufHeader->pPlatformPrivate))->sMemHdr[i].dma_buf_fd));
+                } else {
+                    dce_buf_unlock(1, (size_t *)&(((OMXBase_BufHdrPvtData *)(pOMXBufHeader->pPlatformPrivate))->sMemHdr[i].dma_buf_fd));
+                }
+            }
         }
     }
 

@@ -121,7 +121,7 @@ typedef struct OMXBaseComp
     OMX_ERRORTYPE (*fpReturnEventNotify)(OMX_HANDLETYPE hComponent, OMX_EVENTTYPE eEvent,
                                     OMX_U32 nEventData1, OMX_U32 nEventData2, OMX_PTR pEventData);
 
-    OMX_ERRORTYPE (*fpXlateBuffHandle)(OMX_HANDLETYPE hComponent, OMX_PTR pBufferHdr);
+    OMX_ERRORTYPE (*fpXlateBuffHandle)(OMX_HANDLETYPE hComponent, OMX_PTR pBufferHdr, OMX_BOOL bRegister);
 
 }OMXBaseComp;
 
