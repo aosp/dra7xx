@@ -379,8 +379,8 @@ static void set_primary_display_transform_matrix(omap_hwc_device_t *hwc_dev)
     /* Create primary display translation matrix */
     int lcd_w = display->disp_link.mode->hdisplay;
     int lcd_h = display->disp_link.mode->vdisplay;
-    int orig_w = display->disp_link.fb.width;
-    int orig_h = display->disp_link.fb.height;
+    int orig_w = display->disp_link.mode->hdisplay;
+    int orig_h = display->disp_link.mode->vdisplay;
     hwc_rect_t region = {.left = 0, .top = 0, .right = orig_w, .bottom = orig_h};
     display_transform_t *transform = &display->transform;
 
