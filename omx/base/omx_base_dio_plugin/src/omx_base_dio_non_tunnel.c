@@ -281,12 +281,6 @@ static OMX_ERRORTYPE OMX_DIO_NonTunnel_Close(OMX_HANDLETYPE handle)
                         if( nCompBufs == 2 ) {
                             OMX_CHECK(OMX_FALSE, OMX_ErrorNotImplemented);
                         }
-                    } else {
-                        for ( j = 0; j < MAX_PLANES_PER_BUFFER; j++ ) {
-                            if (((OMXBase_BufHdrPvtData *)(pPort->pBufferlist[i]->pPlatformPrivate))->sMemHdr[j].dma_buf_fd > 0) {
-                                close(((OMXBase_BufHdrPvtData *)(pPort->pBufferlist[i]->pPlatformPrivate))->sMemHdr[j].dma_buf_fd);
-                            }
-                        }
                     }
                 }
             }
