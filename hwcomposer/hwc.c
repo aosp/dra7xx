@@ -554,6 +554,71 @@ static void handle_hotplug(omap_hwc_device_t *hwc_dev)
         }
     }
 }
+static void handle_uevents(omap_hwc_device_t *hwc_dev, const char *buff, int len)
+{
+    int dock;
+    int hdmi;
+    int vsync;
+    int state = 0;
+    uint64_t timestamp = 0;
+    const char *s = buff;
+
+    hdmi = !strcmp(s, "change@/devices/virtual/extcon/hdmi");
+
+    if (!hdmi)
+       return;
+
+    s += strlen(s) + 1;
+
+    while(*s) {
+        if (!strncmp(s, "STATE=", strlen("STATE=")))
+            state = atoi(s + strlen("STATE="));
+
+        s += strlen(s) + 1;
+        if (s - buff >= len)
+            break;
+    }
+
+    hwc_dev->ext_disp_state = state == 1;
+
+
+    handle_hotplug(hwc_dev);
+}
+
+static void *hwc_hdmi_thread(void *data)
+{
+    omap_hwc_device_t *hwc_dev = data;
+    static char uevent_desc[4096];
+    struct pollfd fds[2];
+    int invalidate = 0;
+    int timeout;
+    int err;
+
+    setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
+
+    uevent_init();
+
+    fds[0].fd = uevent_get_fd();
+    fds[0].events = POLLIN;
+    fds[1].fd = hwc_dev->pipe_fds[0];
+    fds[1].events = POLLIN;
+
+    timeout = hwc_dev->idle ? hwc_dev->idle : -1;
+
+    memset(uevent_desc, 0, sizeof(uevent_desc));
+
+    do {
+        err = poll(fds, hwc_dev->idle ? 2 : 1, timeout);
+
+        if (fds[0].revents & POLLIN) {
+            /* keep last 2 zeroes to ensure double 0 termination */
+            int len = uevent_next_event(uevent_desc, sizeof(uevent_desc) - 2);
+            handle_uevents(hwc_dev, uevent_desc, len);
+        }
+    } while (1);
+
+    return NULL;
+}
 
 static void hwc_registerProcs(struct hwc_composer_device_1* dev,
                                     hwc_procs_t const* procs)
@@ -709,7 +774,13 @@ static int hwc_device_open(const hw_module_t* module, const char* name, hw_devic
     property_get("debug.hwc.idle", value, "250");
     hwc_dev->idle = atoi(value);
 
-    handle_hotplug(hwc_dev);
+    if (pthread_create(&hwc_dev->hdmi_thread, NULL, hwc_hdmi_thread, hwc_dev))
+    {
+        ALOGE("failed to create HDMI listening thread (%d): %m", errno);
+        err = -errno;
+        goto done;
+    }
+
 
     ALOGI("open_device(rgb_order=%d nv12_only=%d)",
         hwc_dev->flags_rgb_order, hwc_dev->flags_nv12_only);

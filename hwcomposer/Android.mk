@@ -7,7 +7,7 @@ include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_ARM_MODE := arm
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/../vendor/lib/hw
-LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libhardware libdrm libdrm_omap
+LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libhardware libhardware_legacy libdrm libdrm_omap
 
 LOCAL_CFLAGS += -DSUPPORT_ANDROID_MEMTRACK_HAL
 
