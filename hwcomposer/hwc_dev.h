@@ -37,7 +37,6 @@ struct omap_hwc_device {
     /* static data */
     hwc_composer_device_1_t device;
     pthread_mutex_t ctx_mutex;
-    pthread_t hdmi_thread;
     const hwc_procs_t *cb_procs;
 
     const struct gralloc_module_t *gralloc;
@@ -48,8 +47,6 @@ struct omap_hwc_device {
     int flags_rgb_order;
     int flags_nv12_only;
     float upscaled_nv12_limit;
-
-    int pipe_fds[2];            /* pipe to event thread */
 
     int force_sgx;
     int idle;
