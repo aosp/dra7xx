@@ -870,7 +870,7 @@ OMX_ERRORTYPE OMXVidDec_DataNotify(OMX_HANDLETYPE hComponent)
     OMX_U32                 nInMsgCount = 0;
     OMX_U32                 nOutMsgCount = 0;
     OMX_U32                 Buffer_locked = 1;
-    OMX_U32                 ii = 0, i;
+    OMX_U32                 ii = 0, i, jj = 0;
     OMX_U32                 nStride = OMX_VIDDEC_TILER_STRIDE;
     OMX_U32                 nLumaFilledLen, nChromaFilledLen;
     OMX_PARAM_PORTDEFINITIONTYPE    *pOutputPortDef = NULL;
@@ -1317,6 +1317,17 @@ OMX_ERRORTYPE OMXVidDec_DataNotify(OMX_HANDLETYPE hComponent)
         pDecOutArgs->outputID[ii] = 0;
         ii++;
     }
+
+    jj = 0;
+    while(pDecOutArgs->freeBufID[jj]) {
+        if (!ii && pDecOutArgs->freeBufID[jj] == pVidDecComp->pDecInArgs->inputID) {
+            pVidDecComp->sBase.pPvtData->fpDioCancel(hComponent,
+                                                    OMX_VIDDEC_OUTPUT_PORT, pOutBufHeader);
+            break;
+        }
+        jj++;
+    }
+
     if(((IVIDDEC3_Params *)(pVidDecComp->pDecStaticParams))->inputDataMode == IVIDEO_ENTIREFRAME ) {
         if( pInBufHeader && pDecOutArgs &&
                 (pVidDecComp->pDecDynParams->decodeHeader == XDM_DECODE_AU && pVidDecComp->bSupportDecodeOrderTimeStamp == OMX_TRUE)) {
