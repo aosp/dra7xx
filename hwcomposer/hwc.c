@@ -555,6 +555,50 @@ static void handle_hotplug(omap_hwc_device_t *hwc_dev)
     }
 }
 
+/*
+ * Vsync polling thread
+ *   We poll for drm events in this thread. drm events can be vblank and/or
+ *   page-flip events both occuring on Vsync.
+ */
+static void *hwc_vsync_thread(void *data)
+{
+    omap_hwc_device_t *hwc_dev = data;
+    static char uevent_desc[4096];
+    struct pollfd fds[2];
+    int invalidate = 0;
+    int timeout;
+    int err, i;
+
+    setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
+
+    struct pollfd pfds[1] = {{
+	.fd = hwc_dev->drm_fd,
+	.events = POLLIN,
+	.revents = POLLERR
+    }};
+
+    while (1) {
+        int ret = poll (pfds, ARRAY_SIZE (pfds), 60000);
+        if (ret < 0) {
+            ALOGE ("Event handler error %d", errno);
+            break;
+        } else if (ret == 0) {
+            ALOGI ("Event handler timeout");
+            continue;
+        }
+        for (i = 0; i < ret; i++) {
+            if (pfds[i].fd == hwc_dev->drm_fd) {
+                // ALOGE("Received event on DRMFD!!!!");
+                drmHandleEvent (hwc_dev->drm_fd,
+                        &(hwc_dev->displays[HWC_DISPLAY_PRIMARY]->disp_link.evctx));
+            }
+        }
+    }
+
+    return NULL;
+
+}
+
 static void hwc_registerProcs(struct hwc_composer_device_1* dev,
                                     hwc_procs_t const* procs)
 {
@@ -605,6 +649,18 @@ static int hwc_eventControl(struct hwc_composer_device_1* dev,
             else
                 stop_sw_vsync();
             return 0;
+        } else if (enabled && !hwc_dev->vsync_thread_running) {
+            /* FIXME: is this a good place to create thread? */
+            err = pthread_create(&hwc_dev->vsync_thread,
+                    NULL, hwc_vsync_thread, hwc_dev);
+            if (!err) {
+                hwc_dev->vsync_thread_running = true;
+            } else {
+                /* FIXME: not expecting the thread creation to fail.
+                 * should we use sw vsync as fallback?
+                 */
+                ALOGE("argh, failed to create vsync thread");
+            }
         }
 
         return 0;
@@ -687,6 +743,7 @@ static int hwc_device_open(const hw_module_t* module, const char* name, hw_devic
     hwc_dev->device.getDisplayConfigs = hwc_getDisplayConfigs;
     hwc_dev->device.getDisplayAttributes = hwc_getDisplayAttributes;
     hwc_dev->device.query = hwc_query;
+    hwc_dev->vsync_thread_running = false;
 
     *device = &hwc_dev->device.common;
 

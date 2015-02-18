@@ -505,15 +505,31 @@ static int init_hdmi_display(omap_hwc_device_t *hwc_dev, int disp)
     return 0;
 }
 
+/*
+ * Callback function that gets triggered on vsync
+ */
 static void vblank_handler(int fd, unsigned int frame, unsigned int sec,
         unsigned int usec, void *data)
 {
-    kms_display_t *kdisp = (kms_display_t *)data;
+    int ret;
+    omap_hwc_device_t *hwc_dev = (omap_hwc_device_t *)data;
+    kms_display_t *kdisp = &hwc_dev->displays[HWC_DISPLAY_PRIMARY]->disp_link;
     const hwc_procs_t *procs = kdisp->ctx->cb_procs;
 
+    //ALOGE("NOW[%lld]\n", systemTime(CLOCK_MONOTONIC));
     if (kdisp->vsync_on) {
+        drmVBlank vblank;
         int64_t ts = sec * (int64_t)1000000000 + usec * (int64_t)1000;
         procs->vsync(procs, 0, ts);
+
+        vblank.request.type = DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
+        vblank.request.sequence = 1;
+        vblank.request.signal = (unsigned long)hwc_dev;
+
+        ret = drmWaitVBlank(hwc_dev->drm_fd, &vblank);
+        if (ret < 0) {
+            ALOGE("Failed to request vsync: %d - %s\n", errno, strerror(errno));
+        }
     }
 }
 
@@ -595,6 +611,8 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
     display->disp_link.enc = encoder;
     display->disp_link.crtc_id = resources->crtcs[i];
     display->disp_link.mode = mode;
+
+    memset(&display->disp_link.evctx, 0, sizeof(display->disp_link.evctx));
     display->disp_link.evctx.version = DRM_EVENT_CONTEXT_VERSION;
     display->disp_link.evctx.vblank_handler = vblank_handler;
     display->disp_link.ctx = hwc_dev;
@@ -615,6 +633,25 @@ int init_primary_display(omap_hwc_device_t *hwc_dev)
     if (use_sw_vsync()) {
         init_sw_vsync(hwc_dev);
         primary->use_sw_vsync = true;
+    } else {
+        /*
+         * using vsyncs from display, add a vsync event to
+         * kick start the hwc_vsync_thread
+         */
+        int err;
+        drmVBlank vbl;
+
+        ALOGI("Initializing hw vsync thread\n");
+        vbl.request.type = (DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT);
+        vbl.request.sequence = 1;
+        vbl.request.signal = (unsigned long)hwc_dev;
+        err = drmWaitVBlank(drm_fd, &vbl);
+        if (err < 0) {
+            /* error in drmWaitVBlank() can't use this
+             * use sw vsync instead? */
+        } else {
+            display->disp_link.vsync_on = true;
+        }
     }
 
     /* Use default value in case some of requested display parameters missing */

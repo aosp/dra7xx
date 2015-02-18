@@ -37,6 +37,10 @@ struct omap_hwc_device {
     /* static data */
     hwc_composer_device_1_t device;
     pthread_mutex_t ctx_mutex;
+
+    pthread_t hdmi_thread;
+    pthread_t vsync_thread;
+
     const hwc_procs_t *cb_procs;
 
     const struct gralloc_module_t *gralloc;
@@ -54,6 +58,7 @@ struct omap_hwc_device {
     display_t *displays[MAX_DISPLAYS];
 
     bool ext_disp_state;
+    bool vsync_thread_running;
     int last_ext_ovls;
     int last_int_ovls;
     int tiler1d_slot_size;
