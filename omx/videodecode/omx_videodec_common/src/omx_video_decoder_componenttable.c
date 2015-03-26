@@ -18,10 +18,14 @@
 
 
 extern OMX_ERRORTYPE OMXH264VD_Init(OMX_HANDLETYPE hComponent);
+extern OMX_ERRORTYPE OMXMPEG4VD_Init(OMX_HANDLETYPE hComponent);
+extern OMX_ERRORTYPE OMXH263VD_Init(OMX_HANDLETYPE hComponent);
 
 OMXDecoderComponentList    DecoderList[] =
 {
     { "video_decoder.avc", OMX_VIDEO_CodingAVC, OMXH264VD_Init },              /*! H264  Decoder */
+    {"video_decoder.mpeg4", OMX_VIDEO_CodingMPEG4, OMXMPEG4VD_Init},
+    { "video_decoder.h263", OMX_VIDEO_CodingH263, OMXH263VD_Init },           /*! H263 Decoder */
     { "NULL", 0, NULL }
 };
 

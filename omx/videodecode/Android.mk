@@ -17,6 +17,7 @@ LOCAL_C_INCLUDES += \
         hardware/ti/dce/ \
         $(LOCAL_PATH)/omx_videodec_common/inc/ \
         $(LOCAL_PATH)/omx_h264_dec/inc/ \
+        $(LOCAL_PATH)/omx_mpeg4_dec/inc/ \
         hardware/ti/dce/packages/codec_engine/ \
         hardware/ti/dce/packages/framework_components/ \
         hardware/ti/dce/packages/ivahd_codecs/ \
@@ -39,6 +40,7 @@ LOCAL_SRC_FILES:= omx_videodec_common/src/omx_video_decoder.c \
         omx_videodec_common/src/omx_video_decoder_componenttable.c \
         omx_videodec_common/src/omx_video_decoder_internal.c \
         omx_h264_dec/src/omx_h264dec.c \
+        omx_mpeg4_dec/src/omx_mpeg4dec.c
 
 LOCAL_MODULE:= libOMX.TI.DUCATI1.VIDEO.DECODER
 
